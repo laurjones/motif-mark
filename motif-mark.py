@@ -9,6 +9,8 @@ import re
 LEFT_MARGIN = 20
 GENE_HEIGHT = 100
 VERTICAL_BUFFER = GENE_HEIGHT / 5
+# Shifting genes downward 
+Y_OFFSET = 50
 
 ###########
 # Classes #
@@ -16,22 +18,35 @@ VERTICAL_BUFFER = GENE_HEIGHT / 5
 
 class Gene:
     '''The gene sequence.'''
-    def __init__(self):
-        self.sequence = ""
+    def __init__(self, gene_number: int, gene_name: str):
+        # self.sequence = ""
         self.width = 0
-
+        self.gene_number = gene_number  # Initialize gene_number
+        self.gene_name = gene_name
+        # self.LEFT_MARGIN = 10  # Define LEFT_MARGIN
+        # self.GENE_HEIGHT = 20 # Define GENE_HEIGHT
+    
+    def __str__(self) -> str:
+        return f"My Gene: {self.width=}, {self.gene_number=}, {self.gene_name}"
+    
     def add_sequence(self, seq):
-        self.sequence += seq
-        self.width = len(self.sequence)
+        '''Function to determine the number of nucleotides in my sequence (width).'''
+        # self.sequence = seq
+        self.width = len(seq)
 
-    def draw_gene(self, context: cairo.Context, sequence_length):
+    def draw_gene(self, context: cairo.Context, gene_symbol):
+        # self.gene_number += 1 # Increment gene_number
         x = LEFT_MARGIN
-        y = GENE_HEIGHT * sequence_length + (GENE_HEIGHT / 2)
+        # y = GENE_HEIGHT * sequence_length + (GENE_HEIGHT / 2)
+        y = GENE_HEIGHT * self.gene_number + Y_OFFSET
         context.set_source_rgb(0,0,0)
         context.set_line_width(1)
         context.move_to(x,y)
+        context.show_text(gene_symbol)
+        #context.show_text("jason rules")
         context.line_to(x + self.width, y)
         context.stroke()
+        print(f'debug 123 {x=}, {y=}, {self.width=}')
 
 class Drawing:
     '''A drawing sequence.'''
@@ -42,39 +57,30 @@ class Drawing:
     def draw(self, context):
         self.gene.draw_gene(context)
         
-# class Exon:
-#     '''This is how a exon is drawn.'''
-#     def __init__(self, start: int, end:int, y_offset:int):
+class Exon:
+    '''This is how a exon is drawn.'''
+    def __init__(self, start: int, end:int, y_offset:int):
 
-#         ## Data (Attributes) ##
-#         self.start = start
-#         self.end = end
-#         self.y_offset = y_offset
+        ## Data (Attributes) ##
+        self.start = start
+        self.end = end
+        self.y_offset = y_offset
 
-#     def draw_exon(self, context: cairo.Context):
-#         context = cairo.Context(surface)
-#         context.set_source_rgb(0, 0, 0)
-#         context.move_to(LEFT_MARGIN+self.start)
-#         context.line_to(self.end)
-#         context.stroke()
-#         #surface.finish()
-#         surface.write_to_png("plot.png")
-#         my_exon = Exon(self, context: cairo.Context, beginning, end, exon_length)
-#         my_exon.draw_exon(context)
+    def draw_exon(self, context: cairo.Context):
+        context = cairo.Context(surface)
+        context.set_source_rgb(0, 0, 0)
+        context.move_to(LEFT_MARGIN+self.start)
+        context.line_to(self.end)
+        context.stroke()
+        #surface.finish()
+        surface.write_to_png("plot.png")
+        my_exon = Exon(self, context: cairo.Context, beginning, end, exon_length)
+        my_exon.draw_exon(context)
 
-########
-# Main #
-########
-def get_args():
-    parser= argparse.ArgumentParser()
-    parser.add_argument("-f", "--fasta", help="Input fasta", required=True)
-    parser.add_argument("-m", "--motifs", help="Input motifs", required=True)
-    return parser.parse_args()
-
-args = get_args()
-f=args.fasta
-m=args.motifs 
-
+#############
+# Functions #
+#############
+        
 def oneline_fasta(file:str,intermediate:str):
         '''This function takes a multi line fasta and converts it into a fasta that has a header line and one sequence line '''
         with open(file, "r")as fh, open(intermediate, "w") as fout:
@@ -86,6 +92,24 @@ def oneline_fasta(file:str,intermediate:str):
                 else:
                     print(line,end="",file=fout)
             print("",file=fout)
+
+#############
+# Arguments #
+#############
+            
+def get_args():
+    parser= argparse.ArgumentParser()
+    parser.add_argument("-f", "--fasta", help="Input fasta", required=True)
+    parser.add_argument("-m", "--motifs", help="Input motifs", required=True)
+    return parser.parse_args()
+
+args = get_args()
+f=args.fasta
+m=args.motifs 
+
+########
+# Main #
+########
 
 oneline_fasta(f, "intermediate.fasta")
 
@@ -125,7 +149,16 @@ with open("intermediate.fasta") as fasta_file:
 # Print the swapped dictionary to verify
 #print(sequence_dict)
 
-for gene_symbol in sequence_dict:
+surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 820, 500)
+context = cairo.Context(surface)
+
+# Set background color to white 
+context.set_source_rgb(1, 1, 1)  # White color
+context.paint()
+
+# gene_number = 0
+for gene_number, gene_symbol in enumerate(sequence_dict):
+    print(f"debug 283 yes")
     # Get the DNA sequence for the current gene symbol
     sequence = sequence_dict[gene_symbol]
     
@@ -135,21 +168,20 @@ for gene_symbol in sequence_dict:
     # Print the gene symbol and its corresponding sequence length
     #print(f"Gene: {gene_symbol}, Sequence Length: {sequence_length}")
 
-    # Create a Cairo surface and context
-    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 500, 500)
-    context = cairo.Context(surface)
-
-    # Set background color to white 
-    context.set_source_rgb(1, 1, 1)  # White color
-    context.paint()
+    # # Set background color to white 
+    # context.set_source_rgb(1, 1, 1)  # White color
+    # context.paint()
 
     # Create a Gene object for the current sequence
-    gene = Gene()
+    gene = Gene(gene_number, gene_name = gene_symbol)
     gene.add_sequence(sequence)
 
     # Draw the gene
-    gene.draw_gene(context, sequence_length)
-    
+    print(f"debug 352 {str(gene)=}")
+    gene.draw_gene(context, gene_symbol)
+    # gene_number += 1
+
+
 surface.write_to_png("gene_sequence.png")
 
 
