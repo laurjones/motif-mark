@@ -36,7 +36,7 @@ class Gene:
 
     def draw_gene(self, context: cairo.Context, gene_symbol):
         # self.gene_number += 1 # Increment gene_number
-        x = LEFT_MARGIN
+        x = LEFT_MARGIN 
         # y = GENE_HEIGHT * sequence_length + (GENE_HEIGHT / 2)
         y = GENE_HEIGHT * self.gene_number + Y_OFFSET
         context.set_source_rgb(0,0,0)
@@ -48,34 +48,35 @@ class Gene:
         context.stroke()
         print(f'debug 123 {x=}, {y=}, {self.width=}')
 
-class Drawing:
-    '''A drawing sequence.'''
-    def __init__ (self, gene):
-        self.gene = gene
-        self.context = context
-    
-    def draw(self, context):
-        self.gene.draw_gene(context)
-        
 class Exon:
     '''This is how a exon is drawn.'''
-    def __init__(self, start: int, end:int, y_offset:int):
-
+    def __init__(self, exon_start: int, exon_end:int, gene_number):
         ## Data (Attributes) ##
-        self.start = start
-        self.end = end
-        self.y_offset = y_offset
+        self.exon_start = exon_start
+        self.exon_end = exon_end
+        self.gene_number = gene_number
 
     def draw_exon(self, context: cairo.Context):
-        context = cairo.Context(surface)
-        context.set_source_rgb(0, 0, 0)
-        context.move_to(LEFT_MARGIN+self.start)
-        context.line_to(self.end)
+        x = LEFT_MARGIN + self.exon_start
+        y = GENE_HEIGHT * self.gene_number + Y_OFFSET
+        context.set_source_rgb(0, 0.5, 0)
+        context.set_line_width(4)
+        context.move_to(x,y)
+        context.line_to(LEFT_MARGIN + self.exon_end, y)
         context.stroke()
         #surface.finish()
         surface.write_to_png("plot.png")
-        my_exon = Exon(self, context: cairo.Context, beginning, end, exon_length)
-        my_exon.draw_exon(context)
+
+class Drawing:
+    '''A drawing sequence.'''
+    def __init__ (self, gene, exon):
+        self.gene = gene
+        self.exon = exon
+        # self.context = context
+    
+    def draw(self, context):
+        self.gene.draw_gene(context)
+        self.gene.draw_exon(context)
 
 #############
 # Functions #
@@ -92,6 +93,15 @@ def oneline_fasta(file:str,intermediate:str):
                 else:
                     print(line,end="",file=fout)
             print("",file=fout)
+
+def exon_finder(sequence):
+    '''Returns the start and stop positions of capitialized stretches within the sequence.'''
+    exon_sequence = re.finditer("[A-Z]+", sequence)
+    for start_end in exon_sequence:
+        # eg exon_start_end = (5, 10)
+        exon_start_end = start_end.span()
+        return exon_start_end
+#exon_finder("aaaaaTTTTTcccccGGGGGaaaaa")
 
 #############
 # Arguments #
@@ -168,10 +178,6 @@ for gene_number, gene_symbol in enumerate(sequence_dict):
     # Print the gene symbol and its corresponding sequence length
     #print(f"Gene: {gene_symbol}, Sequence Length: {sequence_length}")
 
-    # # Set background color to white 
-    # context.set_source_rgb(1, 1, 1)  # White color
-    # context.paint()
-
     # Create a Gene object for the current sequence
     gene = Gene(gene_number, gene_name = gene_symbol)
     gene.add_sequence(sequence)
@@ -181,23 +187,15 @@ for gene_number, gene_symbol in enumerate(sequence_dict):
     gene.draw_gene(context, gene_symbol)
     # gene_number += 1
 
+    exon = Exon(exon_start, exon_end, gene_number)
+    #make the exon object
+    exon_start_end = exon_finder(sequence)
+    exon_start = exon_start_end[0]
+    exon_end = exon_start_end[1]
+
 
 surface.write_to_png("gene_sequence.png")
 
-
-# def exon_finder(sequence):
-#     '''Returns the start and stop positions of capitialized stretches within the sequence.'''
-#     exon_sequence = re.finditer("[A-Z]+", sequence)
-#     # returns start and stop position, 0 indexed
-#     for start_end in exon_sequence:
-#         exon_start_end = start_end.span()
-#         return exon_start_end
-
-# #make the exon object
-#     exon = exon_finder(sequence)
-#     exon_start = exon[0]
-#     exon_end = exon[1]
-#     exon_object =Exon(exon_start,exon_end,y_offset)
 
 
 
