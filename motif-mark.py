@@ -2,7 +2,6 @@
 
 import argparse
 import cairo
-import math
 import re
 
 # Global constants for image output
@@ -17,7 +16,7 @@ Y_OFFSET = 50
 ###########
 
 class Gene:
-    '''The gene sequence.'''
+    '''This is how a gene sequence is drawn.'''
     def __init__(self, gene_number: int, gene_name: str):
         # self.sequence = ""
         self.width = 0
@@ -46,7 +45,7 @@ class Gene:
         #context.show_text("jason rules")
         context.line_to(x + self.width, y)
         context.stroke()
-        print(f'debug 123 {x=}, {y=}, {self.width=}')
+        #print(f'debug 123 {x=}, {y=}, {self.width=}')
 
 class Exon:
     '''This is how a exon is drawn.'''
@@ -59,24 +58,48 @@ class Exon:
     def draw_exon(self, context: cairo.Context):
         x = LEFT_MARGIN + self.exon_start
         y = GENE_HEIGHT * self.gene_number + Y_OFFSET
-        context.set_source_rgb(0, 0.5, 0)
-        context.set_line_width(4)
+        context.set_source_rgb(0, 0, 0)
+        context.set_line_width(15)
         context.move_to(x,y)
         context.line_to(LEFT_MARGIN + self.exon_end, y)
         context.stroke()
         #surface.finish()
-        surface.write_to_png("plot.png")
+
+class Motif:
+    '''This is how a motif is drawn.'''
+    def __init__(self, motif_start: int, motif_end:int, gene_number: int, motif_str: str):
+        ## Data (Attributes) ##
+        self.motif_start = motif_start
+        self.motif_end = motif_end
+        self.gene_number = gene_number
+        self.motif_str = motif_str      # eg 'ygcy'
+    
+        self.motif_color = convert_motif_string_to_color(motif_str)
+
+    def __repr__(self) -> str:
+        return f"Motif({self.motif_start}, {self.motif_end}, {self.gene_number}, '{self.motif_str}')"
+
+    def draw_motif(self, context: cairo.Context):
+        x = LEFT_MARGIN + self.motif_start
+        y = GENE_HEIGHT * self.gene_number + Y_OFFSET
+        context.set_source_rgb(*self.motif_color)  # Assuming motif_color is a tuple of RGB values
+        context.set_line_width(8)
+        context.move_to(x, y)
+        context.line_to(LEFT_MARGIN + self.motif_end, y)
+        context.stroke()
 
 class Drawing:
     '''A drawing sequence.'''
-    def __init__ (self, gene, exon):
+    def __init__ (self, gene, exon, motif):
         self.gene = gene
         self.exon = exon
+        self.motif = motif
         # self.context = context
     
     def draw(self, context):
         self.gene.draw_gene(context)
         self.gene.draw_exon(context)
+        self.motif.draw_motif(context)
 
 #############
 # Functions #
@@ -99,9 +122,55 @@ def exon_finder(sequence):
     exon_sequence = re.finditer("[A-Z]+", sequence)
     for start_end in exon_sequence:
         # eg exon_start_end = (5, 10)
+        
         exon_start_end = start_end.span()
         return exon_start_end
 #exon_finder("aaaaaTTTTTcccccGGGGGaaaaa")
+
+def motif_to_regex(motif:str) -> str:
+    '''A funtion to return nucleotides correct nucletoides in motifs corresponding to the IUPAC dict.'''
+    # eg motif= "ycgy", motif_regex = "[CT]cg[CT]" 
+    # Using IUPAC dict
+    iupac_dict = {
+        "Y": "[CT]",
+        "R": "[AG]",
+        "S": "[GC]",
+        "W": "[AT]",
+        "K": "[GT]",
+        "M": "[AC]",
+        "B": "[CGT]",
+        "D": "[AGT]",
+        "H": "[ACT]",
+        "V": "[ACG]",
+        "N": "[ATCG]"
+    }
+
+    # Replacing motifs with corresponding regex patterns
+    
+    regex_motif = motif.upper()
+    for nucleotide, motif in iupac_dict.items():
+        regex_motif = regex_motif.replace(nucleotide, motif)
+
+    return regex_motif
+
+# my_motif_regex = motif_to_regex("ygcy")
+# print(my_motif_regex)
+
+def motif_builder(gene_number: int, sequence: str, motifs: list[str]) -> list[Motif]:
+    motif_list = []
+
+    for motif_str in motifs:
+        regex_motif = motif_to_regex(motif_str)
+        print(f'debug 888 {regex_motif=}')
+        # motif_positions[motif] = [sequence, gene_number, for match in re.finditer(regex_motif, sequence)]
+        for match in re.finditer(regex_motif, sequence, re.IGNORECASE):
+            motif = Motif(match.start(), match.end(), gene_number, motif_str)
+            motif_list.append(motif)
+    return motif_list
+
+# motif_list = motif_builder(1, "actgaaacccttgccttgggaaagcttgct", ["ygcy", "GCAUG"])
+# print(motif_list)
+# print("LJ is rad")
 
 #############
 # Arguments #
@@ -168,7 +237,7 @@ context.paint()
 
 # gene_number = 0
 for gene_number, gene_symbol in enumerate(sequence_dict):
-    print(f"debug 283 yes")
+    #print(f"debug 283 yes")
     # Get the DNA sequence for the current gene symbol
     sequence = sequence_dict[gene_symbol]
     
@@ -183,19 +252,29 @@ for gene_number, gene_symbol in enumerate(sequence_dict):
     gene.add_sequence(sequence)
 
     # Draw the gene
-    print(f"debug 352 {str(gene)=}")
+    #print(f"debug 352 {str(gene)=}")
     gene.draw_gene(context, gene_symbol)
     # gene_number += 1
 
-    exon = Exon(exon_start, exon_end, gene_number)
-    #make the exon object
     exon_start_end = exon_finder(sequence)
     exon_start = exon_start_end[0]
     exon_end = exon_start_end[1]
 
+    # Making the exon object
+    exon = Exon(exon_start, exon_end, gene_number)
+    exon.draw_exon(context)
+
+    motif_strings = ["ygcy", "GCAUG"]
+    '''
+    Elsewhere in my code I want to convert ygcy to (.5, .4, .9)
+    and convert gcaug to (.3, .3, .8)
+    # reads motif list and comes up with a color... reads first one and assigns color so on and so forth
+    '''
+    # motif_object_list = motif_builder(gene_number, sequence, motif_strings)
+    # for motif in motif_object_list:
+    #     motif.draw_motif(context)
+
+# print(motif_list)
+# print("LJ is rad")
 
 surface.write_to_png("gene_sequence.png")
-
-
-
-
