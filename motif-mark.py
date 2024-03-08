@@ -11,6 +11,18 @@ VERTICAL_BUFFER = GENE_HEIGHT / 5
 # Shifting genes downward 
 Y_OFFSET = 50
 
+# assign one color per motif
+# key = motif (ygcy), value = color (0.9, 0.1, 0.1)
+MOTIF_COLOR_DICT: dict[str, tuple[float, float, float]] = {} 
+COLOR_PALETTE = [
+        (0.9, 0.1, 0.1),  # Red
+        (0.1, 0.9, 0.1),  # Green
+        (0.1, 0.1, 0.9),  # Blue
+        (0.9, 0.9, 0.1),   # Yellow
+        (0.8, 0.3, 0.4),   # Mystery
+        # Add more colors as needed
+]
+
 ###########
 # Classes #
 ###########
@@ -22,15 +34,12 @@ class Gene:
         self.width = 0
         self.gene_number = gene_number  # Initialize gene_number
         self.gene_name = gene_name
-        # self.LEFT_MARGIN = 10  # Define LEFT_MARGIN
-        # self.GENE_HEIGHT = 20 # Define GENE_HEIGHT
     
     def __str__(self) -> str:
         return f"My Gene: {self.width=}, {self.gene_number=}, {self.gene_name}"
     
     def add_sequence(self, seq):
         '''Function to determine the number of nucleotides in my sequence (width).'''
-        # self.sequence = seq
         self.width = len(seq)
 
     def draw_gene(self, context: cairo.Context, gene_symbol):
@@ -40,12 +49,11 @@ class Gene:
         y = GENE_HEIGHT * self.gene_number + Y_OFFSET
         context.set_source_rgb(0,0,0)
         context.set_line_width(1)
-        context.move_to(x,y)
+        context.move_to(x,y-35)
         context.show_text(gene_symbol)
-        #context.show_text("jason rules")
+        context.move_to(x,y)
         context.line_to(x + self.width, y)
         context.stroke()
-        #print(f'debug 123 {x=}, {y=}, {self.width=}')
 
 class Exon:
     '''This is how a exon is drawn.'''
@@ -74,7 +82,7 @@ class Motif:
         self.gene_number = gene_number
         self.motif_str = motif_str      # eg 'ygcy'
     
-        self.motif_color = convert_motif_string_to_color(motif_str)
+        self.motif_color = MOTIF_COLOR_DICT[motif_str]
 
     def __repr__(self) -> str:
         return f"Motif({self.motif_start}, {self.motif_end}, {self.gene_number}, '{self.motif_str}')"
@@ -125,7 +133,6 @@ def exon_finder(sequence):
         
         exon_start_end = start_end.span()
         return exon_start_end
-#exon_finder("aaaaaTTTTTcccccGGGGGaaaaa")
 
 def motif_to_regex(motif:str) -> str:
     '''A funtion to return nucleotides correct nucletoides in motifs corresponding to the IUPAC dict.'''
@@ -142,7 +149,8 @@ def motif_to_regex(motif:str) -> str:
         "D": "[AGT]",
         "H": "[ACT]",
         "V": "[ACG]",
-        "N": "[ATCG]"
+        "N": "[ATCG]",
+        "U": "[UT]",
     }
 
     # Replacing motifs with corresponding regex patterns
@@ -158,15 +166,56 @@ def motif_to_regex(motif:str) -> str:
 
 def motif_builder(gene_number: int, sequence: str, motifs: list[str]) -> list[Motif]:
     motif_list = []
-
+    print(f"motif_builder {motifs=}")
     for motif_str in motifs:
         regex_motif = motif_to_regex(motif_str)
-        print(f'debug 888 {regex_motif=}')
-        # motif_positions[motif] = [sequence, gene_number, for match in re.finditer(regex_motif, sequence)]
         for match in re.finditer(regex_motif, sequence, re.IGNORECASE):
             motif = Motif(match.start(), match.end(), gene_number, motif_str)
             motif_list.append(motif)
     return motif_list
+
+def convert_motif_string_to_color(motif_str: str) -> tuple:
+    '''Converts a motif string to RGB color'''
+    # Define your color palette here
+    color_palette = {
+        "A": (0.9, 0.1, 0.1),  # Red
+        "T": (0.1, 0.9, 0.1),  # Green
+        "C": (0.1, 0.1, 0.9),  # Blue
+        "G": (0.9, 0.9, 0.1)   # Yellow
+        # Add more colors as needed
+    }
+    
+    # Convert each nucleotide in the motif string to its corresponding color
+    motif_color = [color_palette.get(nucleotide, (0, 0, 0)) for nucleotide in motif_str.upper()]
+    
+    # Average the colors to get a single color for the motif
+    avg_color = tuple(sum(color[i] for color in motif_color) / len(motif_color) for i in range(3))
+    
+    return avg_color
+
+def draw_legend(context: cairo.Context, motif_colors: dict):
+    # Set font properties for legend labels
+    context.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+    context.set_font_size(12)
+
+    # Set initial position for legend
+    x = 650
+    y = 20
+
+    # Iterate over motif colors and draw legend
+    for motif, color in motif_colors.items():
+        # Draw colored rectangle
+        context.set_source_rgb(*color)
+        context.rectangle(x, y, 20, 10)
+        context.fill()
+
+        # Draw motif label
+        context.set_source_rgb(0, 0, 0)
+        context.move_to(x + 30, y + 10)
+        context.show_text(motif)
+
+        # Update position for next legend item
+        y += 20  # Increase y-coordinate for next legend item
 
 # motif_list = motif_builder(1, "actgaaacccttgccttgggaaagcttgct", ["ygcy", "GCAUG"])
 # print(motif_list)
@@ -183,14 +232,34 @@ def get_args():
     return parser.parse_args()
 
 args = get_args()
-f=args.fasta
-m=args.motifs 
+fasta_filename=args.fasta
+motif_filename=args.motifs
 
 ########
 # Main #
 ########
 
-oneline_fasta(f, "intermediate.fasta")
+motif_str_list = []
+# # assign one color per motif
+# # key = motifs (ygcy), values = colors (0.9, 0.1, 0.1)
+# MOTIF_COLOR_DICT: dict[str, tuple[float, float, float]] = {} 
+# COLOR_PALETTE = [
+#         (0.9, 0.1, 0.1),  # Red
+#         (0.1, 0.9, 0.1),  # Green
+#         (0.1, 0.1, 0.9),  # Blue
+#         (0.9, 0.9, 0.1),   # Yellow
+#         (0.8, 0.3, 0.4),   # Mystery
+#         # Add more colors as needed
+# ]
+
+with open(motif_filename) as f:
+    for index, line in enumerate(f):
+        motif_str = line.strip()
+        print(index)
+        MOTIF_COLOR_DICT[motif_str] = COLOR_PALETTE[index]
+        motif_str_list.append(motif_str)
+
+oneline_fasta(fasta_filename, "intermediate.fasta")
 
 # Initialize an empty dictionary
 sequence_dict = {}
@@ -235,9 +304,7 @@ context = cairo.Context(surface)
 context.set_source_rgb(1, 1, 1)  # White color
 context.paint()
 
-# gene_number = 0
 for gene_number, gene_symbol in enumerate(sequence_dict):
-    #print(f"debug 283 yes")
     # Get the DNA sequence for the current gene symbol
     sequence = sequence_dict[gene_symbol]
     
@@ -252,9 +319,7 @@ for gene_number, gene_symbol in enumerate(sequence_dict):
     gene.add_sequence(sequence)
 
     # Draw the gene
-    #print(f"debug 352 {str(gene)=}")
     gene.draw_gene(context, gene_symbol)
-    # gene_number += 1
 
     exon_start_end = exon_finder(sequence)
     exon_start = exon_start_end[0]
@@ -264,17 +329,10 @@ for gene_number, gene_symbol in enumerate(sequence_dict):
     exon = Exon(exon_start, exon_end, gene_number)
     exon.draw_exon(context)
 
-    motif_strings = ["ygcy", "GCAUG"]
-    '''
-    Elsewhere in my code I want to convert ygcy to (.5, .4, .9)
-    and convert gcaug to (.3, .3, .8)
-    # reads motif list and comes up with a color... reads first one and assigns color so on and so forth
-    '''
-    # motif_object_list = motif_builder(gene_number, sequence, motif_strings)
-    # for motif in motif_object_list:
-    #     motif.draw_motif(context)
+    motif_list = motif_builder(gene_number, sequence, motif_str_list)
+    for motif in motif_list:
+        motif.draw_motif(context)
 
-# print(motif_list)
-# print("LJ is rad")
+        draw_legend(context, MOTIF_COLOR_DICT)
 
-surface.write_to_png("gene_sequence.png")
+surface.write_to_png("gene_sequence2.png")
