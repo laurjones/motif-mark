@@ -17,13 +17,21 @@ In molecular biology, a motif refers to a specific pattern or sequence within a 
 - Identify and highlight motifs within DNA sequences.
 
 ## Features
+- A visualization of genes and their exons.
+- A visualization of motifs within said genes.
+- A legend to interpret the visual representation of each gene, exon, and motif.
 
 ## Handling capabilities
+- Motifs with ambiguous nucleotides
+- Multiple sequences
+- Mulitple motifs
 
 ## Dependencies
+- Pycairo
 
-- **Pycairo**
-
-## Examples
+## Example Output
+- https://github.com/laurjones/motif-mark/blob/main/gene_sequence2.png
 
 ## Contributors
+- https://github.com/laurjones
+
